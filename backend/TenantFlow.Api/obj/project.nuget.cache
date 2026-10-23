@@ -1,24 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "JgsZmtBZG/s=",
+  "dgSpecHash": "Ua16wm9iEek=",
   "success": true,
   "projectFilePath": "C:\\Users\\navodad\\tenantflow-cloud\\backend\\TenantFlow.Api\\TenantFlow.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\navodad\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.8\\microsoft.aspnetcore.openapi.10.0.8.nupkg.sha512",
-    "C:\\Users\\navodad\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512"
+    "C:\\Users\\navodad\\.nuget\\packages\\microsoft.openapi\\2.7.5\\microsoft.openapi.2.7.5.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1903",
-      "level": "Warning",
-      "message": "Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc",
-      "projectPath": "C:\\Users\\navodad\\tenantflow-cloud\\backend\\TenantFlow.Api\\TenantFlow.Api.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\navodad\\tenantflow-cloud\\backend\\TenantFlow.Api\\TenantFlow.Api.csproj",
-      "libraryId": "Microsoft.OpenApi",
-      "targetGraphs": [
-        "net10.0"
-      ]
-    }
-  ]
+  "logs": []
 }
