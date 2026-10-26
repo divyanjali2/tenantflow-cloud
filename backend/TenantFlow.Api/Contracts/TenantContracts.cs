@@ -33,3 +33,10 @@ public sealed record TenantDetailsResponse(
     string Slug,
     string Role,
     DateTimeOffset CreatedAtUtc);
+
+/// <summary>Non-sensitive membership details for a tenant member.</summary>
+public sealed record TenantMemberResponse(
+    Guid UserId,
+    string Email,
+    string Role,
+    DateTimeOffset CreatedAtUtc);

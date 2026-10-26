@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using TenantFlow.Api.Authorization;
 using TenantFlow.Api.Contracts;
 using TenantFlow.Api.Data;
 using TenantFlow.Api.Models;
@@ -13,8 +14,12 @@ namespace TenantFlow.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/tenants")]
-public sealed class TenantsController(ApplicationDbContext dbContext) : ControllerBase
+public sealed class TenantsController(
+    ApplicationDbContext dbContext,
+    ITenantAuthorizationService tenantAuthorizationService) : ControllerBase
 {
+    private static readonly string[] MemberListingRoles = [TenantRoles.Owner, TenantRoles.Admin];
+
     [HttpGet("mine")]
     [ProducesResponseType<IReadOnlyList<TenantListItemResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -116,6 +121,47 @@ public sealed class TenantsController(ApplicationDbContext dbContext) : Controll
         return tenant is null ? NotFound() : Ok(tenant);
     }
 
+    [HttpGet("{tenantId:guid}/members")]
+    [ProducesResponseType<IReadOnlyList<TenantMemberResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TenantMemberResponse>>> GetMembers(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAuthenticatedUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        if (!await tenantAuthorizationService.IsMemberAsync(userId, tenantId, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        if (!await tenantAuthorizationService.HasAnyRoleAsync(
+                userId,
+                tenantId,
+                MemberListingRoles,
+                cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var members = await dbContext.TenantMemberships
+            .AsNoTracking()
+            .Where(membership => membership.TenantId == tenantId)
+            .Select(membership => new TenantMemberResponse(
+                membership.UserId,
+                membership.User.Email!,
+                membership.Role,
+                new DateTimeOffset(DateTime.SpecifyKind(membership.CreatedAtUtc, DateTimeKind.Utc))))
+            .ToListAsync(cancellationToken);
+
+        return Ok(members);
+    }
+
     [HttpPost]
     [ProducesResponseType<CreateTenantResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -160,7 +206,7 @@ public sealed class TenantsController(ApplicationDbContext dbContext) : Controll
             Id = Guid.NewGuid(),
             TenantId = tenant.Id,
             UserId = userId,
-            Role = "Owner",
+            Role = TenantRoles.Owner,
             CreatedAtUtc = createdAtUtc
         };
 

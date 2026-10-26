@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TenantFlow.Api.Configuration;
+using TenantFlow.Api.Authorization;
 using TenantFlow.Api.Data;
 using TenantFlow.Api.Models;
 using TenantFlow.Api.Services;
@@ -21,6 +22,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException(
             "Connection string 'DefaultConnection' is not configured.")));
+builder.Services.AddScoped<ITenantAuthorizationService, TenantAuthorizationService>();
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
     {
@@ -80,3 +82,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }
