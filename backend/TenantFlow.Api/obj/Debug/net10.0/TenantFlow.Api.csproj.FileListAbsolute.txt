@@ -146,3 +146,11 @@ C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\fil
 C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-test-build\TenantFlow.Api.runtimeconfig.json
 C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-test-build\TenantFlow.Api.dll
 C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-test-build\TenantFlow.Api.pdb
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\appsettings.Development.json
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\appsettings.json
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\TenantFlow.Api.staticwebassets.endpoints.json
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\TenantFlow.Api.exe
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\TenantFlow.Api.deps.json
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\TenantFlow.Api.runtimeconfig.json
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\TenantFlow.Api.dll
+C:\Users\navodad\.copilot\session-state\a4f9f475-eb97-4c13-b4e8-05ddfc5cc196\files\rbac-api-build\TenantFlow.Api.pdb

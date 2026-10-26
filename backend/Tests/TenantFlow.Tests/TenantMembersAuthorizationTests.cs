@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
@@ -100,14 +99,6 @@ public sealed class TenantMembersAuthorizationTests : IClassFixture<TenantApiFac
 
 public sealed class TenantApiFactory : WebApplicationFactory<Program>
 {
-    private readonly Microsoft.Data.Sqlite.SqliteConnection _connection =
-        new("Data Source=:memory:");
-
-    public TenantApiFactory()
-    {
-        _connection.Open();
-    }
-
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration(configuration =>
@@ -126,7 +117,8 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<ApplicationDbContext>();
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
-            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection));
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseInMemoryDatabase("TenantFlowTenantAuthorizationTests"));
 
             services.AddAuthentication(options =>
                 {
@@ -172,15 +164,6 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
 
         await dbContext.SaveChangesAsync();
         return new SeededTenant(currentUser.Id, tenant.Id, unrelatedTenantId);
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        if (disposing)
-        {
-            _connection.Dispose();
-        }
     }
 
     private static ApplicationUser NewUser(string email) => new()
