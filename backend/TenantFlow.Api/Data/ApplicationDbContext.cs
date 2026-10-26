@@ -1,12 +1,14 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using TenantFlow.Api.Models;
 
 namespace TenantFlow.Api.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
-    public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -25,7 +27,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         modelBuilder.Entity<ApplicationUser>(entity =>
         {
-            entity.Property(user => user.Email).IsRequired();
+            entity.ToTable("Users");
+            entity.Property(user => user.Email)
+                .IsRequired()
+                .HasColumnType("text");
             entity.HasIndex(user => user.Email).IsUnique();
             entity.HasMany(user => user.Memberships)
                 .WithOne(membership => membership.User)
