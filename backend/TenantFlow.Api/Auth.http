@@ -1,0 +1,27 @@
+@baseUrl = https://localhost:7102
+@email = john@example.com
+@password = SecurePass@123
+@accessToken = paste-access-token-here
+
+### Register a user (expect 201; a repeated email returns 409)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Log in (copy accessToken from the response for the profile request)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Get the authenticated user's profile (expect 401 without a valid token)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+Accept: application/json
