@@ -12,8 +12,8 @@ using TenantFlow.Api.Data;
 namespace TenantFlow.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261026074516_AddIdentitySupport")]
-    partial class AddIdentitySupport
+    [Migration("20261026075615_AddIdentitySchema")]
+    partial class AddIdentitySchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
