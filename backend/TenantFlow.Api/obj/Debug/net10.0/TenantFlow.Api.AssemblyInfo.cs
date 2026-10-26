@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TenantFlow.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+19e9466b64c49e1853a323e19d5365945ca95264")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+97702cc10a5281156bb3bb18bf2f10b79544c66d")]
 [assembly: System.Reflection.AssemblyProductAttribute("TenantFlow.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TenantFlow.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

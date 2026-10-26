@@ -12,7 +12,7 @@ tenantflow-cloud/
 │   ├── TenantFlow.slnx
 │   └── TenantFlow.Api/       # Existing .NET 10 API starter
 ├── frontend/                # Existing React, TypeScript, and Vite starter
-├── infrastructure/          # Infrastructure conventions; configuration planned
+├── infrastructure/          # Local Docker Compose configuration
 ├── docs/
 │   └── architecture.md      # Architecture direction and module responsibilities
 ├── .github/                 # GitHub contribution and automation conventions
@@ -33,7 +33,7 @@ This keeps the initial application operationally simple while allowing modules t
 - .NET 10 SDK.
 - A Node.js release compatible with the Vite version in `frontend/package.json`, plus npm. The installed package's `engines` requirements are authoritative.
 - Git.
-- Docker with Compose will be needed once local infrastructure is introduced; it is not required for the current starter applications.
+- Docker with Compose, for running the local PostgreSQL service.
 
 ## Local development
 
@@ -64,6 +64,10 @@ npm run dev
 
 Open the URL printed by Vite. The frontend currently shows the starter page and does not call the backend. API URL configuration, development proxying, and CORS policy will be introduced with the first integration.
 
+### Local PostgreSQL
+
+From the repository root, create `.env` from `.env.example` and replace the placeholder `POSTGRES_PASSWORD` with a local password. Start and verify PostgreSQL with the commands in the [infrastructure guide](infrastructure/README.md). The database is available on `localhost:5432`; stopping the Compose service preserves its named volume.
+
 ### Checks
 
 ```powershell
@@ -85,6 +89,6 @@ Some backend `bin/` and `obj/` files were already tracked in the starter reposit
 
 ## Scope and next steps
 
-Phase 1 adds structure and documentation only. Future work includes module projects, PostgreSQL/EF Core configuration and migrations, ASP.NET Core Identity integration, tenant-aware authorization and data access, business endpoints, automated tests, local Compose services, and CI workflows.
+PostgreSQL is available as local infrastructure only; the API does not connect to it yet. Future work includes module projects, PostgreSQL/EF Core configuration and migrations, ASP.NET Core Identity integration, tenant-aware authorization and data access, business endpoints, automated tests, and CI workflows.
 
 Authentication, authorization, and tenant isolation require explicit design and verification before production use. No cloud infrastructure is provisioned or deployed by this setup.

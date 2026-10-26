@@ -1,13 +1,44 @@
 # Infrastructure
 
-This directory reserves a home for infrastructure configuration. No runnable Docker, Compose, or Kubernetes configuration is included in Phase 1.
+## Local PostgreSQL
 
-As implementation progresses, use:
+The root-level `docker-compose.yml` starts PostgreSQL 17 for local development. It creates the `tenantflow_db` database and `tenantflow_user` user, binds PostgreSQL to `127.0.0.1:5432`, and persists database files in a named Docker volume. The password is supplied through the root `.env` file and is not committed.
 
-- `docker/` for container build definitions and local Compose services.
-- `kubernetes/` for deployment manifests when deployment work begins.
-- `helm/` for Helm packaging if the deployment approach requires it.
+From the repository root, create your local environment file from the example and replace its placeholder password:
 
-Create those subdirectories when they contain real configuration. Keep deployment secrets outside version control, document required variables alongside each configuration, and use local defaults only where they are safe. Do not use production credentials for local development.
+```powershell
+Copy-Item .env.example .env
+```
 
-The current API and frontend can run directly using the instructions in the [root README](../README.md).
+Start PostgreSQL in the background:
+
+```powershell
+docker compose -f infrastructure/docker-compose.yml up -d
+```
+
+Verify the container and health check:
+
+```powershell
+docker compose -f infrastructure/docker-compose.yml ps
+docker compose -f infrastructure/docker-compose.yml exec postgres pg_isready -U tenantflow_user -d tenantflow_db
+```
+
+The service should show as `healthy`, and `pg_isready` should report that the server is accepting connections. To inspect startup or health-check output, run:
+
+```powershell
+docker compose -f infrastructure/docker-compose.yml logs postgres
+```
+
+Stop the service without removing its persisted database:
+
+```powershell
+docker compose -f infrastructure/docker-compose.yml down
+```
+
+The named `postgres_data` volume remains across stops. Do not use `docker compose down -v` unless you intend to permanently delete the local database data.
+
+The root `.gitignore` excludes the real `.env` file and allows the placeholder-only `.env.example` to be committed. Keep production credentials out of local development configuration.
+
+## Future deployment configuration
+
+Kubernetes manifests or Helm packaging can be added when deployment work begins. Do not use production credentials for local development.
