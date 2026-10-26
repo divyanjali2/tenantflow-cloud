@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "i3WCg9t70gs=",
+  "dgSpecHash": "heRkWHWRhrA=",
   "success": true,
   "projectFilePath": "C:\\Users\\navodad\\tenantflow-cloud\\backend\\TenantFlow.Api\\TenantFlow.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\navodad\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
+    "C:\\Users\\navodad\\.nuget\\packages\\microsoft.aspnetcore.identity.entityframeworkcore\\10.0.8\\microsoft.aspnetcore.identity.entityframeworkcore.10.0.8.nupkg.sha512",
     "C:\\Users\\navodad\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.8\\microsoft.aspnetcore.openapi.10.0.8.nupkg.sha512",
     "C:\\Users\\navodad\\.nuget\\packages\\microsoft.build.framework\\18.0.2\\microsoft.build.framework.18.0.2.nupkg.sha512",
     "C:\\Users\\navodad\\.nuget\\packages\\microsoft.codeanalysis.analyzers\\3.11.0\\microsoft.codeanalysis.analyzers.3.11.0.nupkg.sha512",
