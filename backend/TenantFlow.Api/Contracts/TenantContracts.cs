@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using TenantFlow.Api.Models;
 
 namespace TenantFlow.Api.Contracts;
 
@@ -58,3 +59,38 @@ public sealed record TenantMemberResponse(
     string Email,
     string Role,
     DateTimeOffset CreatedAtUtc);
+
+/// <summary>Payload for creating a tenant project.</summary>
+public sealed record CreateProjectRequest
+{
+    [Required]
+    [StringLength(200)]
+    public required string Name { get; init; }
+
+    public string? Description { get; init; }
+
+    public string Status { get; init; } = ProjectStatuses.Planning;
+}
+
+/// <summary>Payload for updating a tenant project.</summary>
+public sealed record UpdateProjectRequest
+{
+    [Required]
+    [StringLength(200)]
+    public required string Name { get; init; }
+
+    public string? Description { get; init; }
+
+    public string Status { get; init; } = ProjectStatuses.Planning;
+}
+
+/// <summary>Project details scoped to a tenant.</summary>
+public sealed record ProjectResponse(
+    Guid Id,
+    Guid TenantId,
+    string Name,
+    string? Description,
+    string Status,
+    Guid CreatedByUserId,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);

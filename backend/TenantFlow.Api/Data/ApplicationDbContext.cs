@@ -10,6 +10,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+    public DbSet<Project> Projects => Set<Project>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,5 +41,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<TenantMembership>()
             .HasIndex(membership => new { membership.TenantId, membership.UserId })
             .IsUnique();
+
+        modelBuilder.Entity<Project>(entity =>
+        {
+            entity.Property(project => project.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(project => project.Status)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue(ProjectStatuses.Planning);
+            entity.HasIndex(project => project.TenantId);
+            entity.HasOne(project => project.Tenant)
+                .WithMany()
+                .HasForeignKey(project => project.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(project => project.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(project => project.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }

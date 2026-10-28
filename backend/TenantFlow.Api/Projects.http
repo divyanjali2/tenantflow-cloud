@@ -1,0 +1,40 @@
+@baseUrl = https://localhost:7102
+@accessToken = paste-tenant-access-token-here
+@tenantId = 00000000-0000-0000-0000-000000000001
+@projectId = 00000000-0000-0000-0000-000000000002
+
+### Create a project (Owner or Admin)
+POST {{baseUrl}}/api/tenants/{{tenantId}}/projects
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Website Redesign",
+  "description": "Redesign the company website",
+  "status": "Planning"
+}
+
+### List projects for a tenant member
+GET {{baseUrl}}/api/tenants/{{tenantId}}/projects
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Get a project in the specified tenant
+GET {{baseUrl}}/api/tenants/{{tenantId}}/projects/{{projectId}}
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Update a project (Owner or Admin)
+PUT {{baseUrl}}/api/tenants/{{tenantId}}/projects/{{projectId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Website Redesign V2",
+  "description": "Updated project description",
+  "status": "Active"
+}
+
+### Delete a project (Owner only)
+DELETE {{baseUrl}}/api/tenants/{{tenantId}}/projects/{{projectId}}
+Authorization: Bearer {{accessToken}}

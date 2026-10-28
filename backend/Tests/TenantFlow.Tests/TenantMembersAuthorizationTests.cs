@@ -570,6 +570,32 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
         return new SeededUser(user.Id, email);
     }
 
+    public async Task<Guid> SeedProjectAsync(
+        Guid tenantId,
+        Guid createdByUserId,
+        string name = "Test project",
+        string status = ProjectStatuses.Planning,
+        DateTime? createdAtUtc = null)
+    {
+        using var scope = Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var createdAt = createdAtUtc ?? DateTime.UtcNow;
+        var project = new Project
+        {
+            TenantId = tenantId,
+            Name = name,
+            Status = status,
+            CreatedByUserId = createdByUserId,
+            CreatedAtUtc = createdAt,
+            UpdatedAtUtc = createdAt
+        };
+        dbContext.Projects.Add(project);
+        await dbContext.SaveChangesAsync();
+        return project.Id;
+    }
+
     private static ApplicationUser NewUser(string email) => new()
     {
         Id = Guid.NewGuid(),
