@@ -22,6 +22,7 @@ public sealed class TenantsController(
 {
     private static readonly string[] MemberListingRoles = [TenantRoles.Owner, TenantRoles.Admin];
     private static readonly string[] InvitationRoles = [TenantRoles.Owner];
+    private static readonly string[] OwnerOnlyRoles = [TenantRoles.Owner];
 
     [HttpGet("mine")]
     [ProducesResponseType<IReadOnlyList<TenantListItemResponse>>(StatusCodes.Status200OK)]
@@ -163,6 +164,132 @@ public sealed class TenantsController(
             .ToListAsync(cancellationToken);
 
         return Ok(members);
+    }
+
+    [HttpPatch("{tenantId:guid}/members/{userId:guid}/role")]
+    [ProducesResponseType<TenantMemberResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TenantMemberResponse>> UpdateMemberRole(
+        Guid tenantId,
+        Guid userId,
+        UpdateTenantMemberRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAuthenticatedUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        if (!await tenantAuthorizationService.IsMemberAsync(
+                currentUserId,
+                tenantId,
+                cancellationToken))
+        {
+            return NotFound();
+        }
+
+        if (!await tenantAuthorizationService.HasAnyRoleAsync(
+                currentUserId,
+                tenantId,
+                OwnerOnlyRoles,
+                cancellationToken))
+        {
+            return Forbid();
+        }
+
+        if (request.Role is not TenantRoles.Admin and not TenantRoles.Member)
+        {
+            ModelState.AddModelError(
+                nameof(request.Role),
+                "Role must be Admin or Member.");
+            return ValidationProblem(ModelState);
+        }
+
+        var membership = await dbContext.TenantMemberships
+            .Include(entry => entry.User)
+            .FirstOrDefaultAsync(
+                entry => entry.TenantId == tenantId && entry.UserId == userId,
+                cancellationToken);
+        if (membership is null)
+        {
+            return NotFound();
+        }
+
+        if (membership.Role == TenantRoles.Owner || userId == currentUserId)
+        {
+            ModelState.AddModelError(
+                nameof(request.Role),
+                "The tenant Owner's role cannot be changed.");
+            return ValidationProblem(ModelState);
+        }
+
+        membership.Role = request.Role;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = new TenantMemberResponse(
+            membership.UserId,
+            membership.User.Email!,
+            membership.Role,
+            new DateTimeOffset(DateTime.SpecifyKind(membership.CreatedAtUtc, DateTimeKind.Utc)));
+        return Ok(response);
+    }
+
+    [HttpDelete("{tenantId:guid}/members/{userId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveMember(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAuthenticatedUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        if (!await tenantAuthorizationService.IsMemberAsync(
+                currentUserId,
+                tenantId,
+                cancellationToken))
+        {
+            return NotFound();
+        }
+
+        if (!await tenantAuthorizationService.HasAnyRoleAsync(
+                currentUserId,
+                tenantId,
+                OwnerOnlyRoles,
+                cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var membership = await dbContext.TenantMemberships
+            .FirstOrDefaultAsync(
+                entry => entry.TenantId == tenantId && entry.UserId == userId,
+                cancellationToken);
+        if (membership is null)
+        {
+            return NotFound();
+        }
+
+        if (membership.Role == TenantRoles.Owner || userId == currentUserId)
+        {
+            ModelState.AddModelError(
+                nameof(userId),
+                "The tenant Owner cannot be removed.");
+            return ValidationProblem(ModelState);
+        }
+
+        dbContext.TenantMemberships.Remove(membership);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("{tenantId:guid}/invitations")]

@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenantFlow.Api.Authorization;
+using TenantFlow.Api.Contracts;
 using TenantFlow.Api.Data;
 using TenantFlow.Api.Models;
 
@@ -195,6 +196,283 @@ public sealed class TenantMembersAuthorizationTests : IClassFixture<TenantApiFac
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
+    [Fact]
+    public async Task OwnerCanPromoteMemberToAdmin()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = TenantRoles.Admin });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updatedMember = await response.Content.ReadFromJsonAsync<TenantMemberResponse>();
+        Assert.NotNull(updatedMember);
+        Assert.Equal(seed.OtherUserId, updatedMember.UserId);
+        Assert.Equal(TenantRoles.Admin, updatedMember.Role);
+        Assert.Equal(TenantRoles.Admin, await ReadMembershipRoleAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Fact]
+    public async Task OwnerCanDemoteAdminToMember()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        await SetMembershipRoleAsync(seed.TenantId, seed.OtherUserId, TenantRoles.Admin);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(TenantRoles.Member, await ReadMembershipRoleAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Theory]
+    [InlineData(TenantRoles.Member)]
+    [InlineData(TenantRoles.Admin)]
+    public async Task NonOwnerCannotChangeMemberRoles(string callerRole)
+    {
+        var seed = await _factory.SeedTenantAsync(callerRole);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = TenantRoles.Admin });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(TenantRoles.Member, await ReadMembershipRoleAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Fact]
+    public async Task NonMemberCannotChangeMemberRole()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner, includeCurrentUserMembership: false);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = TenantRoles.Admin });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OwnerCannotChangeOwnRole()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.UserId}/role",
+            new { role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(TenantRoles.Owner, await ReadMembershipRoleAsync(seed.TenantId, seed.UserId));
+    }
+
+    [Fact]
+    public async Task OwnerCannotChangeAnotherOwnersRole()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        await SetMembershipRoleAsync(seed.TenantId, seed.OtherUserId, TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(TenantRoles.Owner, await ReadMembershipRoleAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Fact]
+    public async Task OwnerCannotAssignOwnerRole()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = TenantRoles.Owner });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(TenantRoles.Member, await ReadMembershipRoleAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Fact]
+    public async Task InvalidMemberRoleReturnsBadRequest()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = "NotARealRole" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MissingTargetMembershipReturnsNotFoundWhenChangingRole()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{Guid.NewGuid()}/role",
+            new { role = TenantRoles.Admin });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(TenantRoles.Member)]
+    [InlineData(TenantRoles.Admin)]
+    public async Task OwnerCanRemoveMemberAndAdmin(string targetRole)
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        if (targetRole == TenantRoles.Admin)
+        {
+            await SetMembershipRoleAsync(seed.TenantId, seed.OtherUserId, TenantRoles.Admin);
+        }
+
+        using var client = CreateClient(seed.UserId);
+        var response = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Null(await ReadMembershipRoleOrNullAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Theory]
+    [InlineData(TenantRoles.Member)]
+    [InlineData(TenantRoles.Admin)]
+    public async Task NonOwnerCannotRemoveMembers(string callerRole)
+    {
+        var seed = await _factory.SeedTenantAsync(callerRole);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.NotNull(await ReadMembershipRoleOrNullAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Fact]
+    public async Task OwnerCannotRemoveThemselves()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.UserId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(TenantRoles.Owner, await ReadMembershipRoleAsync(seed.TenantId, seed.UserId));
+    }
+
+    [Fact]
+    public async Task OwnerCannotRemoveAnotherOwner()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        await SetMembershipRoleAsync(seed.TenantId, seed.OtherUserId, TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(TenantRoles.Owner, await ReadMembershipRoleAsync(seed.TenantId, seed.OtherUserId));
+    }
+
+    [Fact]
+    public async Task RemovingMemberPreservesUserAccount()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True(await dbContext.Users.AnyAsync(user => user.Id == seed.OtherUserId));
+    }
+
+    [Fact]
+    public async Task RemovingMemberPreservesTheirMembershipInOtherTenants()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner, createUnrelatedTenant: true);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(
+            TenantRoles.Member,
+            await ReadMembershipRoleAsync(seed.UnrelatedTenantId, seed.OtherUserId));
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True(await dbContext.Tenants.AnyAsync(tenant => tenant.Id == seed.TenantId));
+    }
+
+    [Fact]
+    public async Task MemberManagementRequiresAuthentication()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = _factory.CreateClient();
+
+        var roleResponse = await client.PatchAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}/role",
+            new { role = TenantRoles.Admin });
+        var removalResponse = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{seed.OtherUserId}");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, roleResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, removalResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task MissingTargetMembershipReturnsNotFoundWhenRemovingMember()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.DeleteAsync(
+            $"/api/tenants/{seed.TenantId}/members/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private async Task SetMembershipRoleAsync(Guid tenantId, Guid userId, string role)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var membership = await dbContext.TenantMemberships
+            .SingleAsync(entry => entry.TenantId == tenantId && entry.UserId == userId);
+        membership.Role = role;
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task<string> ReadMembershipRoleAsync(Guid tenantId, Guid userId) =>
+        await ReadMembershipRoleOrNullAsync(tenantId, userId)
+        ?? throw new InvalidOperationException("Expected tenant membership was not found.");
+
+    private async Task<string?> ReadMembershipRoleOrNullAsync(Guid tenantId, Guid userId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await dbContext.TenantMemberships
+            .Where(entry => entry.TenantId == tenantId && entry.UserId == userId)
+            .Select(entry => entry.Role)
+            .SingleOrDefaultAsync();
+    }
+
     private HttpClient CreateClient(Guid userId)
     {
         var client = _factory.CreateClient();
@@ -269,7 +547,15 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
         }
 
         await dbContext.SaveChangesAsync();
-        return new SeededTenant(currentUser.Id, tenant.Id, unrelatedTenantId);
+        if (createUnrelatedTenant)
+        {
+            var unrelatedTenant = await dbContext.Tenants
+                .SingleAsync(entry => entry.Id == unrelatedTenantId);
+            dbContext.TenantMemberships.Add(NewMembership(otherUser, unrelatedTenant, TenantRoles.Member));
+            await dbContext.SaveChangesAsync();
+        }
+
+        return new SeededTenant(currentUser.Id, otherUser.Id, tenant.Id, unrelatedTenantId);
     }
 
     public async Task<SeededUser> SeedUserAsync(string email)
@@ -315,7 +601,7 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
     };
 }
 
-public sealed record SeededTenant(Guid UserId, Guid TenantId, Guid UnrelatedTenantId);
+public sealed record SeededTenant(Guid UserId, Guid OtherUserId, Guid TenantId, Guid UnrelatedTenantId);
 public sealed record SeededUser(Guid UserId, string Email);
 
 public sealed class TestAuthenticationHandler(

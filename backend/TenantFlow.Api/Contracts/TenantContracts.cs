@@ -45,6 +45,13 @@ public sealed record CreateTenantInvitationRequest
     public required string Role { get; init; }
 }
 
+/// <summary>Payload for changing a tenant member's role.</summary>
+public sealed record UpdateTenantMemberRoleRequest
+{
+    [Required]
+    public required string Role { get; init; }
+}
+
 /// <summary>Non-sensitive membership details for a tenant member.</summary>
 public sealed record TenantMemberResponse(
     Guid UserId,
