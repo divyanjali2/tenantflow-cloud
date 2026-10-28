@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -16,9 +17,11 @@ namespace TenantFlow.Api.Controllers;
 [Route("api/tenants")]
 public sealed class TenantsController(
     ApplicationDbContext dbContext,
-    ITenantAuthorizationService tenantAuthorizationService) : ControllerBase
+    ITenantAuthorizationService tenantAuthorizationService,
+    UserManager<ApplicationUser> userManager) : ControllerBase
 {
     private static readonly string[] MemberListingRoles = [TenantRoles.Owner, TenantRoles.Admin];
+    private static readonly string[] InvitationRoles = [TenantRoles.Owner];
 
     [HttpGet("mine")]
     [ProducesResponseType<IReadOnlyList<TenantListItemResponse>>(StatusCodes.Status200OK)]
@@ -162,6 +165,88 @@ public sealed class TenantsController(
         return Ok(members);
     }
 
+    [HttpPost("{tenantId:guid}/invitations")]
+    [ProducesResponseType<TenantMemberResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TenantMemberResponse>> CreateInvitation(
+        Guid tenantId,
+        CreateTenantInvitationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAuthenticatedUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        if (!await tenantAuthorizationService.IsMemberAsync(userId, tenantId, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        if (!await tenantAuthorizationService.HasAnyRoleAsync(
+                userId,
+                tenantId,
+                InvitationRoles,
+                cancellationToken))
+        {
+            return Forbid();
+        }
+
+        if (request.Role is not TenantRoles.Member and not TenantRoles.Admin)
+        {
+            ModelState.AddModelError(
+                nameof(request.Role),
+                "Role must be Member or Admin.");
+            return ValidationProblem(ModelState);
+        }
+
+        var invitedUser = await userManager.FindByEmailAsync(request.Email);
+        if (invitedUser?.Email is null)
+        {
+            return NotFound();
+        }
+
+        var alreadyMember = await dbContext.TenantMemberships
+            .AsNoTracking()
+            .AnyAsync(
+                membership => membership.TenantId == tenantId && membership.UserId == invitedUser.Id,
+                cancellationToken);
+        if (alreadyMember)
+        {
+            return MembershipConflict();
+        }
+
+        var membership = new TenantMembership
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            UserId = invitedUser.Id,
+            Role = request.Role,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        dbContext.TenantMemberships.Add(membership);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsTenantMembershipUniqueViolation(exception))
+        {
+            return MembershipConflict();
+        }
+
+        var response = new TenantMemberResponse(
+            invitedUser.Id,
+            invitedUser.Email,
+            membership.Role,
+            new DateTimeOffset(DateTime.SpecifyKind(membership.CreatedAtUtc, DateTimeKind.Utc)));
+        return Created($"/api/tenants/{tenantId:D}/members", response);
+    }
+
     [HttpPost]
     [ProducesResponseType<CreateTenantResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -233,6 +318,13 @@ public sealed class TenantsController(
             Title = "A tenant with this slug already exists."
         });
 
+    private ConflictObjectResult MembershipConflict() =>
+        Conflict(new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = "The user is already a member of this tenant."
+        });
+
     private bool TryGetAuthenticatedUserId(out Guid userId) =>
         Guid.TryParse(User.FindFirstValue(JwtRegisteredClaimNames.Sub), out userId);
 
@@ -241,5 +333,12 @@ public sealed class TenantsController(
         {
             SqlState: PostgresErrorCodes.UniqueViolation,
             ConstraintName: "IX_Tenants_Slug"
+        };
+
+    private static bool IsTenantMembershipUniqueViolation(DbUpdateException exception) =>
+        exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "IX_TenantMemberships_TenantId_UserId"
         };
 }

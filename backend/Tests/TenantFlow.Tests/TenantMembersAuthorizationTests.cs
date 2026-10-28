@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
@@ -89,6 +90,111 @@ public sealed class TenantMembersAuthorizationTests : IClassFixture<TenantApiFac
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task OwnerCanInviteExistingUserUsingNormalizedEmail()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        var invitedUser = await _factory.SeedUserAsync($"sarah-{Guid.NewGuid():N}@example.com");
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/invitations",
+            new { email = invitedUser.Email.ToUpperInvariant(), role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(
+            $"/api/tenants/{seed.TenantId}/members",
+            response.Headers.Location?.OriginalString);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var membership = await dbContext.TenantMemberships
+            .SingleAsync(entry => entry.TenantId == seed.TenantId && entry.UserId == invitedUser.UserId);
+        Assert.Equal(TenantRoles.Member, membership.Role);
+    }
+
+    [Fact]
+    public async Task NonOwnerMemberCannotInviteUser()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Member);
+        var invitedUser = await _factory.SeedUserAsync($"sarah-{Guid.NewGuid():N}@example.com");
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/invitations",
+            new { email = invitedUser.Email, role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NonMemberReceivesNotFoundWhenInvitingUser()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner, includeCurrentUserMembership: false);
+        var invitedUser = await _factory.SeedUserAsync($"sarah-{Guid.NewGuid():N}@example.com");
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/invitations",
+            new { email = invitedUser.Email, role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OwnerCannotAssignOwnerRoleThroughInvitation()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        var invitedUser = await _factory.SeedUserAsync($"sarah-{Guid.NewGuid():N}@example.com");
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/invitations",
+            new { email = invitedUser.Email, role = TenantRoles.Owner });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OwnerReceivesNotFoundWhenInvitingUnknownEmail()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        using var client = CreateClient(seed.UserId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/invitations",
+            new { email = $"missing-{Guid.NewGuid():N}@example.com", role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OwnerReceivesConflictWhenInvitingExistingMember()
+    {
+        var seed = await _factory.SeedTenantAsync(TenantRoles.Owner);
+        var invitedUser = await _factory.SeedUserAsync($"sarah-{Guid.NewGuid():N}@example.com");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            dbContext.TenantMemberships.Add(new TenantMembership
+            {
+                Id = Guid.NewGuid(),
+                TenantId = seed.TenantId,
+                UserId = invitedUser.UserId,
+                Role = TenantRoles.Member
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = CreateClient(seed.UserId);
+        var response = await client.PostAsJsonAsync(
+            $"/api/tenants/{seed.TenantId}/invitations",
+            new { email = invitedUser.Email, role = TenantRoles.Member });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     private HttpClient CreateClient(Guid userId)
     {
         var client = _factory.CreateClient();
@@ -166,6 +272,18 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
         return new SeededTenant(currentUser.Id, tenant.Id, unrelatedTenantId);
     }
 
+    public async Task<SeededUser> SeedUserAsync(string email)
+    {
+        using var scope = Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var user = NewUser(email);
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+        return new SeededUser(user.Id, email);
+    }
+
     private static ApplicationUser NewUser(string email) => new()
     {
         Id = Guid.NewGuid(),
@@ -198,6 +316,7 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
 }
 
 public sealed record SeededTenant(Guid UserId, Guid TenantId, Guid UnrelatedTenantId);
+public sealed record SeededUser(Guid UserId, string Email);
 
 public sealed class TestAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,

@@ -34,6 +34,17 @@ public sealed record TenantDetailsResponse(
     string Role,
     DateTimeOffset CreatedAtUtc);
 
+/// <summary>Details for inviting an existing user to a tenant.</summary>
+public sealed record CreateTenantInvitationRequest
+{
+    [Required]
+    [EmailAddress]
+    public required string Email { get; init; }
+
+    [Required]
+    public required string Role { get; init; }
+}
+
 /// <summary>Non-sensitive membership details for a tenant member.</summary>
 public sealed record TenantMemberResponse(
     Guid UserId,
