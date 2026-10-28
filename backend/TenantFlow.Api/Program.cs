@@ -11,6 +11,15 @@ using TenantFlow.Api.Models;
 using TenantFlow.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var isLocalPasswordResetCommand =
+    args.Length > 0 && args[0] == "--reset-local-password";
+
+if (isLocalPasswordResetCommand && !builder.Environment.IsDevelopment())
+{
+    Console.Error.WriteLine("The local password reset command is available only in Development.");
+    Environment.ExitCode = 1;
+    return;
+}
 
 // Add services to the container.
 
@@ -23,7 +32,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         ?? throw new InvalidOperationException(
             "Connection string 'DefaultConnection' is not configured.")));
 builder.Services.AddScoped<ITenantAuthorizationService, TenantAuthorizationService>();
-builder.Services
+var identityBuilder = builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
     {
         options.User.RequireUniqueEmail = true;
@@ -40,6 +49,12 @@ builder.Services
     .AddRoles<IdentityRole<Guid>>()
     .AddSignInManager()
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
+if (builder.Environment.IsDevelopment())
+{
+    identityBuilder.AddDefaultTokenProviders();
+}
+
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services
@@ -67,6 +82,14 @@ builder.Services.AddAuthorization();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+if (isLocalPasswordResetCommand)
+{
+    Environment.ExitCode = await TenantFlow.Api.LocalDevelopmentPasswordResetCommand.RunAsync(
+        app.Services,
+        args.Skip(1).ToArray());
+    return;
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
