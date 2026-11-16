@@ -5,16 +5,16 @@ namespace TenantFlow.Api;
 
 internal static class LocalDevelopmentPasswordResetCommand
 {
+    private const string TargetAccountEmail = "testuser@tenantflow.com";
     private const int MaximumPasswordLength = 1024;
 
     public static async Task<int> RunAsync(IServiceProvider services, string[] arguments)
     {
         if (arguments.Length != 1
-            || string.IsNullOrWhiteSpace(arguments[0])
-            || !string.Equals(arguments[0], arguments[0].Trim(), StringComparison.Ordinal))
+            || !string.Equals(arguments[0], TargetAccountEmail, StringComparison.OrdinalIgnoreCase))
         {
             Console.Error.WriteLine(
-                "Usage: --reset-local-password <account-email> (Development only).");
+                $"Usage: --reset-local-password {TargetAccountEmail} (Development only).");
             return 1;
         }
 
@@ -26,11 +26,29 @@ internal static class LocalDevelopmentPasswordResetCommand
 
         await using var scope = services.CreateAsyncScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var user = await userManager.FindByEmailAsync(arguments[0]);
+        var user = await userManager.FindByEmailAsync(TargetAccountEmail);
         if (user is null)
         {
             Console.Error.WriteLine("No account was found for that email address.");
             return 1;
+        }
+
+        if (string.IsNullOrWhiteSpace(user.SecurityStamp))
+        {
+            var stampResult = await userManager.UpdateSecurityStampAsync(user);
+            if (!stampResult.Succeeded)
+            {
+                WriteIdentityErrors(stampResult);
+                return 1;
+            }
+
+            user = await userManager.FindByEmailAsync(TargetAccountEmail);
+            if (user is null)
+            {
+                Console.Error.WriteLine(
+                    "The account could not be reloaded after initializing its security stamp.");
+                return 1;
+            }
         }
 
         var password = ReadHiddenPassword("New password: ");
@@ -45,16 +63,20 @@ internal static class LocalDevelopmentPasswordResetCommand
         var result = await userManager.ResetPasswordAsync(user, resetToken, password);
         if (!result.Succeeded)
         {
-            foreach (var error in result.Errors)
-            {
-                Console.Error.WriteLine($"{error.Code}: {error.Description}");
-            }
-
+            WriteIdentityErrors(result);
             return 1;
         }
 
         Console.WriteLine("Password reset succeeded. Existing tenant memberships were not changed.");
         return 0;
+    }
+
+    private static void WriteIdentityErrors(IdentityResult result)
+    {
+        foreach (var error in result.Errors)
+        {
+            Console.Error.WriteLine($"{error.Code}: {error.Description}");
+        }
     }
 
     private static string ReadHiddenPassword(string prompt)
