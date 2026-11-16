@@ -6,6 +6,9 @@ import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WorkspacePage } from './pages/WorkspacePage'
+import { ProjectsPage } from './pages/ProjectsPage'
+import { TasksPage } from './pages/TasksPage'
+import { WorkScope } from './components/WorkScope'
 import { TenantProvider } from './tenants/TenantProvider'
 
 function ProtectedWorkspace() {
@@ -20,8 +23,11 @@ export default function App() {
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedWorkspace />}><Route element={<AppLayout />}>
       <Route path="/dashboard" element={<DashboardPage />} />
-      <Route path="/projects" element={<WorkspacePage section="projects" />} />
-      <Route path="/tasks" element={<WorkspacePage section="tasks" />} />
+      <Route element={<WorkScope />}>
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
+      </Route>
       <Route path="/team" element={<WorkspacePage section="team" />} />
       <Route path="/settings" element={<SettingsPage />} />
     </Route></Route>

@@ -25,6 +25,15 @@ export function apiErrorMessage(error: unknown): string {
   if (!error.response) return 'We couldn’t connect to TenantFlow. Please try again.'
   if (error.response.status === 401) return 'Your email or password is incorrect, or your session has expired.'
   if (error.response.status === 403) return 'You don’t have permission to view this information.'
+  if (error.response.status === 404) return 'This resource is no longer available in the selected workspace. Refresh and try again.'
+  if (error.response.status === 400) {
+    const body: unknown = error.response.data
+    if (body && typeof body === 'object' && 'errors' in body && body.errors && typeof body.errors === 'object') {
+      const messages = Object.values(body.errors).flatMap((value: unknown) => Array.isArray(value) ? value.filter((item: unknown): item is string => typeof item === 'string') : [])
+      if (messages.length) return messages.join(' ')
+    }
+    return 'Please check the form values and try again.'
+  }
   if (error.response.status >= 500) return 'TenantFlow is temporarily unavailable. Please try again shortly.'
   return 'We couldn’t complete your request. Please check your details and try again.'
 }

@@ -58,6 +58,7 @@ describe('frontend authentication and tenant foundation', () => {
       expect(config.headers.get('Authorization')).toBe(`Bearer ${token}`)
       if (config.url === '/auth/me') return response(config, user)
       if (config.url === '/tenants/mine') return response(config, tenants)
+      if (config.url === `/tenants/${tenants[0].tenantId}/projects`) return response(config, [])
       throw new Error('Unexpected endpoint')
     }
     mount('/tasks')
@@ -65,8 +66,8 @@ describe('frontend authentication and tenant foundation', () => {
     await actor.type(screen.getByLabelText('Email address'), user.email)
     await actor.type(screen.getByLabelText('Password'), crypto.randomUUID())
     await actor.click(screen.getByRole('button', { name: 'Sign in to your workspace' }))
-    await screen.findByRole('heading', { name: 'Your task workspace is taking shape.' })
-    expect(calls).toEqual(['/auth/login', '/auth/me', '/tenants/mine'])
+    await screen.findByRole('heading', { name: 'Your task board starts with a project' }, { timeout: 5000 })
+    expect(calls).toEqual(['/auth/login', '/auth/me', '/tenants/mine', `/tenants/${tenants[0].tenantId}/projects`])
     expect(getSessionSnapshot().user).toEqual(user)
     expect(localStorage.length).toBe(0)
     expect(sessionStorage.length).toBe(0)

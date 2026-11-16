@@ -25,7 +25,7 @@ export function AppLayout() {
   const { selectedTenant } = useTenants()
   const location = useLocation()
   const [mobileNav, setMobileNav] = useState(false)
-  const page = navigation.find((item) => item.to === location.pathname)?.label ?? 'Workspace'
+  const page = location.pathname.startsWith('/projects/') ? 'Task board' : navigation.find((item) => item.to === location.pathname)?.label ?? 'Workspace'
   const initials = user?.email.slice(0, 2).toUpperCase() ?? ''
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">Skip to content</a>

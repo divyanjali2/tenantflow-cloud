@@ -18,7 +18,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const state: unknown = location.state
-  const from = state && typeof state === 'object' && 'from' in state && typeof state.from === 'string' && destinations.includes(state.from) ? state.from : '/dashboard'
+  const from = state && typeof state === 'object' && 'from' in state && typeof state.from === 'string' && (destinations.includes(state.from) || /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/tasks$/i.test(state.from)) ? state.from : '/dashboard'
   if (session.status === 'authenticated') return <Navigate to={from} replace />
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
