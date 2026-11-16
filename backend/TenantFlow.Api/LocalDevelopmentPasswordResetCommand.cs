@@ -10,6 +10,12 @@ internal static class LocalDevelopmentPasswordResetCommand
 
     public static async Task<int> RunAsync(IServiceProvider services, string[] arguments)
     {
+        if (!services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+        {
+            Console.Error.WriteLine("The local password reset command is available only in Development.");
+            return 1;
+        }
+
         if (arguments.Length != 1
             || !string.Equals(arguments[0], TargetAccountEmail, StringComparison.OrdinalIgnoreCase))
         {
@@ -24,6 +30,27 @@ internal static class LocalDevelopmentPasswordResetCommand
             return 1;
         }
 
+        try
+        {
+            return await ResetPasswordAsync(services);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.Error.WriteLine("Password reset cancelled. The security stamp may already have been initialized.");
+            return 1;
+        }
+        catch (Exception)
+        {
+            // Exception messages can contain sensitive data from stores or token providers.
+            Console.Error.WriteLine(
+                "Password reset could not be completed. Check the local database and Identity configuration. "
+                + "The security stamp may already have been initialized.");
+            return 1;
+        }
+    }
+
+    private static async Task<int> ResetPasswordAsync(IServiceProvider services)
+    {
         await using var scope = services.CreateAsyncScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByEmailAsync(TargetAccountEmail);
@@ -33,29 +60,33 @@ internal static class LocalDevelopmentPasswordResetCommand
             return 1;
         }
 
+        var originalUserId = user.Id;
         if (string.IsNullOrWhiteSpace(user.SecurityStamp))
         {
             var stampResult = await userManager.UpdateSecurityStampAsync(user);
             if (!stampResult.Succeeded)
             {
+                Console.Error.WriteLine("Security stamp initialization failed. Password reset was not attempted.");
                 WriteIdentityErrors(stampResult);
                 return 1;
             }
+        }
 
-            user = await userManager.FindByEmailAsync(TargetAccountEmail);
-            if (user is null)
-            {
-                Console.Error.WriteLine(
-                    "The account could not be reloaded after initializing its security stamp.");
-                return 1;
-            }
+        // A fresh scope avoids returning the original EF-tracked user when reloading.
+        await using var resetScope = services.CreateAsyncScope();
+        userManager = resetScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        user = await userManager.FindByEmailAsync(TargetAccountEmail);
+        if (user is null || user.Id != originalUserId || string.IsNullOrWhiteSpace(user.SecurityStamp))
+        {
+            Console.Error.WriteLine("The existing account could not be reloaded with an initialized security stamp.");
+            return 1;
         }
 
         var password = ReadHiddenPassword("New password: ");
         var confirmation = ReadHiddenPassword("Confirm new password: ");
         if (!string.Equals(password, confirmation, StringComparison.Ordinal))
         {
-            Console.Error.WriteLine("The passwords did not match. No changes were made.");
+            Console.Error.WriteLine("The passwords did not match. The password was not changed; the security stamp may have been initialized.");
             return 1;
         }
 
@@ -63,6 +94,7 @@ internal static class LocalDevelopmentPasswordResetCommand
         var result = await userManager.ResetPasswordAsync(user, resetToken, password);
         if (!result.Succeeded)
         {
+            Console.Error.WriteLine("Password reset failed. Use at least 12 characters, 4 distinct characters, uppercase, lowercase, a digit and a symbol.");
             WriteIdentityErrors(result);
             return 1;
         }
@@ -75,7 +107,8 @@ internal static class LocalDevelopmentPasswordResetCommand
     {
         foreach (var error in result.Errors)
         {
-            Console.Error.WriteLine($"{error.Code}: {error.Description}");
+            // Do not print descriptions: a custom password validator could include input.
+            Console.Error.WriteLine($"Identity error: {error.Code}");
         }
     }
 
@@ -90,6 +123,12 @@ internal static class LocalDevelopmentPasswordResetCommand
             while (true)
             {
                 var key = Console.ReadKey(intercept: true);
+                if (key.Key == ConsoleKey.Escape)
+                {
+                    Console.WriteLine();
+                    throw new OperationCanceledException();
+                }
+
                 if (key.Key == ConsoleKey.Enter)
                 {
                     Console.WriteLine();

@@ -11,6 +11,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<Project> Projects => Set<Project>();
+    public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +42,26 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<TenantMembership>()
             .HasIndex(membership => new { membership.TenantId, membership.UserId })
             .IsUnique();
+
+        modelBuilder.Entity<ProjectTask>(entity =>
+        {
+            entity.Property(task => task.Title).IsRequired().HasMaxLength(200);
+            entity.Property(task => task.Status).IsRequired().HasMaxLength(20)
+                .HasDefaultValue(ProjectTaskStatuses.ToDo);
+            entity.Property(task => task.Priority).IsRequired().HasMaxLength(20)
+                .HasDefaultValue(ProjectTaskPriorities.Medium);
+            entity.HasIndex(task => task.TenantId);
+            entity.HasIndex(task => task.ProjectId);
+            entity.HasIndex(task => task.AssignedToUserId);
+            entity.HasOne(task => task.Tenant).WithMany()
+                .HasForeignKey(task => task.TenantId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(task => task.Project).WithMany()
+                .HasForeignKey(task => task.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(task => task.CreatedByUser).WithMany()
+                .HasForeignKey(task => task.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(task => task.AssignedToUser).WithMany()
+                .HasForeignKey(task => task.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
+        });
 
         modelBuilder.Entity<Project>(entity =>
         {

@@ -489,6 +489,8 @@ public sealed class TenantApiFactory : WebApplicationFactory<Program>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                // Integration tests must not require permission to write to the Windows Event Log.
+                ["Logging:EventLog:LogLevel:Default"] = "None",
                 ["Jwt:Key"] = "unit-test-only-signing-key-that-is-at-least-32-bytes",
                 ["Jwt:Issuer"] = "TenantFlow.Tests",
                 ["Jwt:Audience"] = "TenantFlow.Tests",
