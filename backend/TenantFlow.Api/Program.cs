@@ -1,12 +1,96 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using TenantFlow.Api.Configuration;
+using TenantFlow.Api.Authorization;
+using TenantFlow.Api.Data;
+using TenantFlow.Api.Models;
+using TenantFlow.Api.Services;
+
 var builder = WebApplication.CreateBuilder(args);
+var isLocalPasswordResetCommand =
+    args.Length > 0 && args[0] == "--reset-local-password";
+
+if (isLocalPasswordResetCommand && !builder.Environment.IsDevelopment())
+{
+    Console.Error.WriteLine("The local password reset command is available only in Development.");
+    Environment.ExitCode = 1;
+    return;
+}
 
 // Add services to the container.
 
+var jwtSettings = JwtSettings.FromConfiguration(builder.Configuration);
+
 builder.Services.AddControllers();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException(
+            "Connection string 'DefaultConnection' is not configured.")));
+builder.Services.AddScoped<ITenantAuthorizationService, TenantAuthorizationService>();
+var identityBuilder = builder.Services
+    .AddIdentityCore<ApplicationUser>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.Password.RequiredLength = 12;
+        options.Password.RequiredUniqueChars = 4;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+    })
+    .AddRoles<IdentityRole<Guid>>()
+    .AddSignInManager()
+    .AddEntityFrameworkStores<ApplicationDbContext>();
+
+if (builder.Environment.IsDevelopment())
+{
+    identityBuilder.AddDefaultTokenProviders();
+}
+
+builder.Services.AddSingleton(jwtSettings);
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key)),
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            ValidateLifetime = true,
+            RequireExpirationTime = true,
+            ClockSkew = TimeSpan.Zero,
+            NameClaimType = JwtRegisteredClaimNames.Sub
+        };
+    });
+builder.Services.AddAuthorization();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+if (isLocalPasswordResetCommand)
+{
+    Environment.ExitCode = await TenantFlow.Api.LocalDevelopmentPasswordResetCommand.RunAsync(
+        app.Services,
+        args.Skip(1).ToArray());
+    return;
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -16,8 +100,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

@@ -1,0 +1,56 @@
+@baseUrl = https://localhost:7102
+@accessToken = paste-access-token-here
+
+### Create a tenant (expect 201; requires a valid login token)
+POST {{baseUrl}}/api/tenants
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "ABC Technologies",
+  "slug": "abc-technologies"
+}
+
+### Duplicate slug (expect 409 after creating the tenant above)
+POST {{baseUrl}}/api/tenants
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Another Company",
+  "slug": "abc-technologies"
+}
+
+### Invalid slug (expect 400)
+POST {{baseUrl}}/api/tenants
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Invalid Slug Example",
+  "slug": "-Not-valid-"
+}
+
+### Unauthenticated request (remove the Authorization header; expect 401)
+POST {{baseUrl}}/api/tenants
+Content-Type: application/json
+
+{
+  "name": "ABC Technologies",
+  "slug": "abc-technologies"
+}
+
+### List only the authenticated user's tenants
+GET {{baseUrl}}/api/tenants/mine
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Get tenant details (expect 404 if it does not exist or is not a member)
+GET {{baseUrl}}/api/tenants/00000000-0000-0000-0000-000000000001
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Verify membership / select a tenant (expect 404 if inaccessible)
+POST {{baseUrl}}/api/tenants/00000000-0000-0000-0000-000000000001/select
+Authorization: Bearer {{accessToken}}
+Accept: application/json
