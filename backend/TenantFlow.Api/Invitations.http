@@ -1,0 +1,12 @@
+@baseUrl = https://localhost:7102
+@accessToken = paste-access-token-here
+
+### Invite an existing user as a tenant member (Owner only)
+POST {{baseUrl}}/api/tenants/00000000-0000-0000-0000-000000000001/invitations
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "sarah@example.com",
+  "role": "Member"
+}

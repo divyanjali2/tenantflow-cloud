@@ -1,0 +1,35 @@
+@baseUrl = https://localhost:7102
+@accessToken = paste-owner-access-token-here
+@tenantId = 00000000-0000-0000-0000-000000000001
+@memberUserId = 00000000-0000-0000-0000-000000000002
+
+### Promote a member to Admin (Owner only)
+PATCH {{baseUrl}}/api/tenants/{{tenantId}}/members/{{memberUserId}}/role
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "Admin"
+}
+
+### Demote an Admin to Member (Owner only)
+PATCH {{baseUrl}}/api/tenants/{{tenantId}}/members/{{memberUserId}}/role
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "Member"
+}
+
+### Invalid role example (expect 400)
+PATCH {{baseUrl}}/api/tenants/{{tenantId}}/members/{{memberUserId}}/role
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "Owner"
+}
+
+### Remove a member or Admin (Owner only; expect 204)
+DELETE {{baseUrl}}/api/tenants/{{tenantId}}/members/{{memberUserId}}
+Authorization: Bearer {{accessToken}}
