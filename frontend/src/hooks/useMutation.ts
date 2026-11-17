@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiErrorMessage } from '../api/client'
 
-export function useMutation() {
+export function useMutation(describeError: (error: unknown) => string = apiErrorMessage) {
   const lifecycle = useRef<AbortController | null>(null)
   const pending = useRef(false)
   const [busy, setBusy] = useState(false)
@@ -21,7 +21,7 @@ export function useMutation() {
       await action(controller.signal)
       if (!controller.signal.aborted) onSuccess()
     } catch (cause: unknown) {
-      if (!controller.signal.aborted) setError(apiErrorMessage(cause))
+      if (!controller.signal.aborted) setError(describeError(cause))
     } finally {
       pending.current = false
       if (!controller.signal.aborted) setBusy(false)

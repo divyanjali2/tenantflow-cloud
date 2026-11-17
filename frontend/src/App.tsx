@@ -5,7 +5,7 @@ import { LoadingState } from './components/States'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { WorkspacePage } from './pages/WorkspacePage'
+import { TeamPage } from './pages/TeamPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { TasksPage } from './pages/TasksPage'
 import { WorkScope } from './components/WorkScope'
@@ -27,8 +27,8 @@ export default function App() {
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
+        <Route path="/team" element={<TeamPage />} />
       </Route>
-      <Route path="/team" element={<WorkspacePage section="team" />} />
       <Route path="/settings" element={<SettingsPage />} />
     </Route></Route>
     <Route path="*" element={<Navigate to="/dashboard" replace />} />

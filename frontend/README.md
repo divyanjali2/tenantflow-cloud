@@ -35,7 +35,8 @@ Open `http://localhost:5173`. Sign in with an existing account. All six routes a
 available: `/login`, `/dashboard`, `/projects`, `/tasks`, `/team`, `/settings`.
 Projects and tasks are functional. A project opens its board at
 `/projects/{projectId}/tasks`; `/tasks` opens the first available project with a
-project selector. Team remains a navigation placeholder. The existing dashboard
+project selector. Team provides the workspace member directory and Owner-only
+membership management. The existing dashboard
 shows the actual workspace count, membership role and workspace creation date.
 
 ## API and HTTPS setup
@@ -54,6 +55,9 @@ Only existing API endpoints are called:
 | Change task status | `PATCH /api/tenants/{tenantId}/projects/{projectId}/tasks/{taskId}/status` |
 | Assign/unassign task | `PATCH /api/tenants/{tenantId}/projects/{projectId}/tasks/{taskId}/assignee` |
 | Load assignees (Owner/Admin) | `GET /api/tenants/{tenantId}/members` |
+| Add registered user (Owner) | `POST /api/tenants/{tenantId}/invitations` |
+| Change member role (Owner) | `PATCH /api/tenants/{tenantId}/members/{userId}/role` |
+| Remove membership (Owner) | `DELETE /api/tenants/{tenantId}/members/{userId}` |
 
 The browser calls relative `/api` URLs. Vite proxies them to the HTTPS backend
 with `changeOrigin: true` and `secure: false` for the self-signed localhost
@@ -105,7 +109,9 @@ backend remains the authority. In-memory storage does not eliminate XSS risk.
 - `src/auth/`: memory-only session, expiry and React subscription.
 - `src/tenants/`: tenant loading, retries, selection and scoped context.
 - `src/components/`: responsive shell, navigation, brand, selector and shared states.
-- `src/pages/`: login, dashboard, projects, task boards, account details and team placeholder.
+- `src/pages/`: login, dashboard, projects, task boards, account details and the team directory.
+- `src/api/team.ts`: typed member mutations, reuse of the existing member list, and context-specific errors.
+- `src/components/MemberDialogs.tsx`: Add Member, role-change and removal confirmation dialogs.
 - `src/api/work.ts`: project/task/member DTOs and tenant-scoped requests.
 - `src/hooks/`: abortable resource and mutation state with late-response guards.
 - `src/components/WorkScope.tsx`: resets tenant/role-specific pages and dialogs immediately.
@@ -113,6 +119,7 @@ backend remains the authority. In-memory storage does not eliminate XSS risk.
 - `src/index.css`: Tailwind import, light theme, reusable component styles and responsive layout.
 - `tests/auth.test.tsx`: route protection, login, tenant switching, errors, logout and expiry.
 - `tests/work.test.tsx`: CRUD request contracts, roles, pagination/filtering and tenant isolation.
+- `tests/team.test.tsx`: team roles, exact request bodies, search, errors and tenant switching.
 
 ```powershell
 npm run build
@@ -182,6 +189,59 @@ before the frontend requests its tasks.
 Automated tests use test-only API adapters; real authenticated CRUD still needs
 your running backend and existing account. This step changes no backend files
 and creates or applies no migrations.
+
+## Team management — Phase 4 Step 3
+
+Owners and Admins can view the team table at `/team`. It shows the actual email,
+user ID, tenant role and permitted actions from the existing member response DTO.
+That DTO has no name field, so search is a case-insensitive email substring match
+over the currently loaded tenant's members. The table scrolls horizontally within
+its container on small screens and is keyboard focusable.
+
+Only Owners see Add Member, Change role and Remove controls. All Owner rows and
+the authenticated user's own row are protected. Admins have read-only directory
+access. Members see an access-limited message and do not request the member-list
+endpoint, matching the backend's Owner/Admin restriction. Backend authorization
+remains authoritative, including when cached frontend role information is stale.
+
+Add Member accepts an existing registered email and `Admin` or `Member` role.
+It sends exactly `{ email, role }` to the existing `/invitations` endpoint, which
+immediately adds a membership; no email is sent and no account is created. Role
+changes send exactly `{ role }`. Removal requires confirmation and deletes only
+the tenant membership, preserving the user account and other memberships.
+
+Validation errors (400), expiry (401), forbidden access (403), unknown users or
+unavailable memberships/workspaces (404), duplicate memberships (409), and network
+failures have visible feedback. Failed writes keep their dialog and draft values.
+Successful writes reload the server's member list. Tenant/role changes remount the
+page through the existing WorkScope, clearing search, records, dialogs and notices;
+aborted or late responses cannot replace the new tenant's state.
+
+Manual testing, with your existing backend and registered accounts:
+
+1. Run `npm run build`, `npm test`, then `npm run dev` in `frontend/`.
+2. As Owner, open Team and compare emails, IDs and roles to the member response.
+   Search for part of an email using mixed case; clear the search. Check a narrow
+   screen and use keyboard Tab/Shift+Tab/Escape with the table and dialogs.
+3. Open Add Member. Verify its immediate-access explanation, add a registered user
+   as Member, then change that user's role to Admin and back. No Owner option
+   should exist. Verify minimal bodies and selected tenant IDs in Network requests.
+4. Try an unknown registered email and an already-added email. Expect 404 and 409
+   feedback respectively, with the entered values preserved. Simulate invalid
+   role/email data, stale permissions and offline errors to check 400/403/network
+   handling. An authenticated 401 must clear the session and return to login.
+5. Open removal confirmation and cancel; no DELETE should occur. Then remove a
+   disposable membership and verify that only workspace access is removed. Every
+   Owner row must stay protected, including a different Owner's row.
+6. As Admin, check that the directory is visible with no management controls. As
+   Member, check that no member directory request or management control appears.
+7. Switch workspaces after searching or during loading. Search, records and draft
+   dialogs must reset; late responses must not display the previous workspace's
+   members. All subsequent member requests must use the newly selected tenant.
+
+Automated checks use isolated test-only API adapters; no sample data is supplied
+to application pages and no real users or memberships are changed by the tests.
+No backend files, migrations, or authentication configuration change in this step.
 
 References: [Tailwind Vite plugin](https://tailwindcss.com/docs/installation/using-vite),
 [Vite proxy configuration](https://vite.dev/config/server-options.html#server-proxy),
