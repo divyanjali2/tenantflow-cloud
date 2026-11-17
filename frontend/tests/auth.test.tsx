@@ -36,6 +36,32 @@ beforeEach(() => { clearSession(); localStorage.clear(); sessionStorage.clear() 
 afterEach(() => { cleanup(); clearSession(); api.defaults.adapter = originalAdapter; vi.useRealTimers() })
 
 describe('frontend authentication and tenant foundation', () => {
+  it('validates required, email and password-length fields before calling the API', async () => {
+    const adapter = vi.fn<AxiosAdapter>()
+    api.defaults.adapter = adapter
+    mount('/login')
+    const actor = userEvent.setup()
+    const email = screen.getByLabelText('Email address') as HTMLInputElement
+    const password = screen.getByLabelText('Password') as HTMLInputElement
+    const submit = screen.getByRole('button', { name: 'Sign in to your workspace' })
+    await actor.click(submit)
+    expect(email.validity.valueMissing).toBe(true)
+    expect(password.validity.valueMissing).toBe(true)
+    await actor.type(email, 'invalid-email')
+    await actor.type(password, crypto.randomUUID())
+    await actor.click(submit)
+    expect(email.validity.typeMismatch).toBe(true)
+    expect(adapter).not.toHaveBeenCalled()
+    await actor.clear(email)
+    await actor.type(email, 'validation@example.test')
+    await actor.clear(password)
+    await actor.type(password, crypto.randomUUID().slice(0, 5))
+    expect(password.minLength).toBe(12)
+    // JSDOM does not enforce minlength during checkValidity as browsers do;
+    // test the form constraint and its actual value without inventing validation.
+    expect(password.value.length).toBeLessThan(password.minLength)
+  })
+
   it('redirects every protected route to login without making API requests', () => {
     const adapter = vi.fn<AxiosAdapter>()
     api.defaults.adapter = adapter

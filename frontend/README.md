@@ -296,9 +296,10 @@ change. Switch between tenants with different counts while a request is pending
 and verify that no previous statistics remain. Check an empty tenant, an overdue
 incomplete task, a completed task with a past due date, and offline/error states.
 
-Backend tests reuse the existing isolated EF InMemory infrastructure, with actual
-JWT signature/issuer/audience/lifetime validation and an injected UTC test clock.
-They do not apply migrations or write to your PostgreSQL database. Frontend tests
+The original Phase 4 backend checks remain in the legacy test directory. Phase 5
+adds [real PostgreSQL integration tests](../backend/TenantFlow.Api.Tests/README.md)
+with actual registration/login/JWT authentication and per-test container databases.
+Migrations run only against those disposable test databases. Frontend tests
 use isolated API adapters; functional dashboard pages always call the real API.
 Live PostgreSQL/authenticated browser verification requires your local API and
 account. New files include DashboardController/DashboardContracts, backend summary

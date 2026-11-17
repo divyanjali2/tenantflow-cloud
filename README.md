@@ -71,13 +71,15 @@ From the repository root, create `.env` from `.env.example` and replace the plac
 ### Checks
 
 ```powershell
-dotnet build backend/TenantFlow.slnx
+dotnet restore backend/TenantFlow.slnx
+dotnet build backend/TenantFlow.slnx --configuration Release -p:UseAppHost=false
+dotnet test backend/TenantFlow.slnx --configuration Release --no-build
 cd frontend
-npm run lint
 npm run build
+npm run test -- --run
 ```
 
-There are no automated test projects or frontend test scripts yet. A successful build should not be interpreted as a passing business test suite.
+Backend integration tests live in `backend/TenantFlow.Api.Tests` and require a running Linux Docker engine. They create a disposable PostgreSQL container and a fresh database per test, use real Identity/JWT authentication, and clean up automatically. They never accept a development or production database connection string. Frontend tests use Vitest and React Testing Library with test-only HTTP adapters. See [the integration test guide](backend/TenantFlow.Api.Tests/README.md) for prerequisites, safety controls and feature filters.
 
 ## Configuration and secrets
 
@@ -89,6 +91,6 @@ Some backend `bin/` and `obj/` files were already tracked in the starter reposit
 
 ## Scope and next steps
 
-PostgreSQL is available as local infrastructure only; the API does not connect to it yet. Future work includes module projects, PostgreSQL/EF Core configuration and migrations, ASP.NET Core Identity integration, tenant-aware authorization and data access, business endpoints, automated tests, and CI workflows.
+Automated coverage now includes registration/login, JWT protection, tenant RBAC and isolation, membership management, projects, tasks, assignment/filtering/pagination, dashboard analytics, and the React flows. The new backend test solution references the outer API only. CI deployment and cloud infrastructure remain separate work.
 
 Authentication, authorization, and tenant isolation require explicit design and verification before production use. No cloud infrastructure is provisioned or deployed by this setup.
