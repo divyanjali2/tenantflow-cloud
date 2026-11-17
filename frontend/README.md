@@ -58,6 +58,7 @@ Only existing API endpoints are called:
 | Add registered user (Owner) | `POST /api/tenants/{tenantId}/invitations` |
 | Change member role (Owner) | `PATCH /api/tenants/{tenantId}/members/{userId}/role` |
 | Remove membership (Owner) | `DELETE /api/tenants/{tenantId}/members/{userId}` |
+| Dashboard statistics (all tenant members) | `GET /api/tenants/{tenantId}/dashboard/summary` |
 
 The browser calls relative `/api` URLs. Vite proxies them to the HTTPS backend
 with `changeOrigin: true` and `secure: false` for the self-signed localhost
@@ -243,6 +244,70 @@ Automated checks use isolated test-only API adapters; no sample data is supplied
 to application pages and no real users or memberships are changed by the tests.
 No backend files, migrations, or authentication configuration change in this step.
 
-References: [Tailwind Vite plugin](https://tailwindcss.com/docs/installation/using-vite),
+## Dashboard analytics — Phase 4 Step 4
+
+The existing dashboard layout, tenant selector and workspace/account cards remain.
+Its analytics section requests the selected tenant's dashboard summary. Project,
+task, overdue and member counts and the completion percentage all come from that
+API response. No statistics are fabricated when the request fails: the section
+shows an error and retry action. Refresh statistics reloads the summary. Loading
+skeletons replace old values, and tenant changes remount the analytics section,
+abort requests and reject late responses from the previous workspace.
+
+Analytics is loaded separately so other routes do not download chart code.
+Recharts renders a task status donut and project status bars, with visible text
+values alongside each chart. A native, labelled progress indicator presents task
+completion. Empty workspaces render actual zero counts and empty chart states,
+without fake slices. The summary supplies Active and Completed project counts;
+the bar chart's Other value is `totalProjects - activeProjects - completedProjects`
+and is explicitly labelled as Planning, On Hold and Cancelled combined.
+
+The API is JWT-protected and available to Owner/Admin/Member memberships. A valid
+token without membership, or a nonexistent tenant, receives 404. Read queries use
+AsNoTracking and perform project/task aggregates in the database plus a scoped
+membership count; entities are not loaded to calculate totals. Completed tasks
+never count as overdue. Other tasks are overdue only if DueDateUtc is non-null
+and strictly before the request's UTC time. The percentage is completed / total
+times 100, rounded to two decimals; a zero task total returns 0. Responses are
+marked no-store. No model or migration change is needed.
+
+From the repository root:
+
+```powershell
+dotnet build .\backend\TenantFlow.Api\TenantFlow.Api.csproj --no-restore --configuration DashboardAnalytics
+dotnet test .\backend\Tests\TenantFlow.Tests\TenantFlow.Tests.csproj --no-restore -p:OutputPath=bin/dashboard-analytics/ -p:UseAppHost=false
+dotnet run --project .\backend\TenantFlow.Api\TenantFlow.Api.csproj --configuration DashboardAnalytics --launch-profile https
+```
+
+In a separate terminal:
+
+```powershell
+cd frontend
+npm ci
+npm run build
+npm test
+npm run dev
+```
+
+Stop an older API on the same ports before starting the new version. Verify the
+dashboard with your own registered account and existing data. Compare summary
+responses to the cards, charts and progress indicator; refresh after a task status
+change. Switch between tenants with different counts while a request is pending
+and verify that no previous statistics remain. Check an empty tenant, an overdue
+incomplete task, a completed task with a past due date, and offline/error states.
+
+Backend tests reuse the existing isolated EF InMemory infrastructure, with actual
+JWT signature/issuer/audience/lifetime validation and an injected UTC test clock.
+They do not apply migrations or write to your PostgreSQL database. Frontend tests
+use isolated API adapters; functional dashboard pages always call the real API.
+Live PostgreSQL/authenticated browser verification requires your local API and
+account. New files include DashboardController/DashboardContracts, backend summary
+tests, `src/api/dashboard.ts`, `src/components/DashboardAnalytics.tsx` and frontend
+dashboard tests. Program registers TimeProvider.System; the shared backend factory
+is extensible for JWT tests. The dashboard, styles and existing auth test adapters
+are updated to support summary loading.
+
+References: [Recharts responsive charts](https://recharts.github.io/en-US/api/ResponsiveContainer/),
+[Tailwind Vite plugin](https://tailwindcss.com/docs/installation/using-vite),
 [Vite proxy configuration](https://vite.dev/config/server-options.html#server-proxy),
 [Axios interceptors](https://axios-http.com/docs/interceptors).

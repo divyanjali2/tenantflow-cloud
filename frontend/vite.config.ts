@@ -5,6 +5,8 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Prebundle the lazy dashboard dependency before serving modules to the browser.
+  optimizeDeps: { include: ['recharts'] },
   server: {
     host: 'localhost', port: 5173, strictPort: true,
     proxy: {

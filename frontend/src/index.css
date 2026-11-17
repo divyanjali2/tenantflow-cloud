@@ -256,6 +256,36 @@
   .team-scroll-hint { @apply text-[10px] md:hidden; }
 }
 
+@layer components {
+  .dashboard-analytics { @apply mt-8; }
+  .analytics-stats { @apply grid gap-4 sm:grid-cols-2 xl:grid-cols-4; }
+  .analytics-stats .stat-card { @apply min-h-[125px]; }
+  .analytics-stats .stat-card > p { @apply max-w-[180px] pr-8 leading-5; }
+  .analytics-charts { @apply mt-5 grid min-w-0 gap-5 xl:grid-cols-2; }
+  .analytics-chart { @apply min-w-0 p-5; }
+  .analytics-chart h3, .completion-panel h3 { @apply text-base font-semibold text-[#39523e]; }
+  .chart-caption { @apply mt-2 text-xs leading-5 text-[#62765d]; }
+  .chart-canvas { @apply mt-3 h-[240px] w-full min-w-0; }
+  .chart-empty { @apply flex min-h-[160px] items-center justify-center text-center text-sm text-[#62765d]; }
+  .chart-values { @apply mt-3 grid grid-cols-3 gap-2 border-t border-[#e3e9df] pt-4; }
+  .chart-values dt { @apply flex items-center gap-1.5 text-[10px] text-[#62765d]; }
+  .chart-values dt > span { @apply size-2 shrink-0 rounded-full; }
+  .chart-values dd { @apply mt-2 text-lg font-semibold text-[#39523e]; }
+  .completion-panel { @apply mt-5 grid grid-cols-[1fr_auto] items-center gap-4 p-5; }
+  .completion-panel p { @apply mt-2 text-xs text-[#62765d]; }
+  .completion-panel > strong { @apply text-2xl font-semibold text-[#28745b]; }
+  .completion-panel progress { @apply col-span-2 h-3 w-full overflow-hidden rounded-full; appearance: none; background: #e3ebdf; }
+  .completion-panel progress::-webkit-progress-bar { background: #e3ebdf; border-radius: 999px; }
+  .completion-panel progress::-webkit-progress-value { background: #28745b; border-radius: 999px; }
+  .completion-panel progress::-moz-progress-bar { background: #28745b; border-radius: 999px; }
+  .completion-panel .completion-note { @apply col-span-2 mt-0 text-[10px] leading-5; }
+  .dashboard-skeleton { @apply animate-pulse; }
+  .skeleton-stat { @apply space-y-4 p-5; }
+  .skeleton-stat span { @apply block h-3 w-3/4 rounded bg-[#e5ecdf]; }
+  .skeleton-stat span:nth-child(2) { @apply h-7 w-1/3; }
+  .skeleton-chart { @apply h-[330px] bg-[#eaf0e5]; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

@@ -481,7 +481,7 @@ public sealed class TenantMembersAuthorizationTests : IClassFixture<TenantApiFac
     }
 }
 
-public sealed class TenantApiFactory : WebApplicationFactory<Program>
+public class TenantApiFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

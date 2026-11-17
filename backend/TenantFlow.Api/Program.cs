@@ -26,6 +26,7 @@ if (isLocalPasswordResetCommand && !builder.Environment.IsDevelopment())
 var jwtSettings = JwtSettings.FromConfiguration(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection")

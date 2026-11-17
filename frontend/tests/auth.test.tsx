@@ -16,6 +16,7 @@ const tenants: Tenant[] = [
   { tenantId: crypto.randomUUID(), name: 'First workspace', slug: 'first', role: 'Member', createdAtUtc: '2026-01-01T00:00:00Z' },
   { tenantId: crypto.randomUUID(), name: 'Second workspace', slug: 'second', role: 'Admin', createdAtUtc: '2026-02-01T00:00:00Z' },
 ]
+const emptySummary = { totalProjects: 0, activeProjects: 0, completedProjects: 0, totalTasks: 0, todoTasks: 0, inProgressTasks: 0, completedTasks: 0, overdueTasks: 0, totalMembers: 2, taskCompletionPercentage: 0 }
 
 function response(config: InternalAxiosRequestConfig, data: unknown, status = 200): AxiosResponse {
   return { data, status, statusText: status === 200 ? 'OK' : 'Unauthorized', headers: {}, config }
@@ -96,7 +97,7 @@ describe('frontend authentication and tenant foundation', () => {
 
   it('switches tenants from real contract responses and logs out without retaining workspace data', async () => {
     authenticate()
-    api.defaults.adapter = async (config) => response(config, tenants)
+    api.defaults.adapter = async (config) => response(config, config.url?.endsWith('/dashboard/summary') ? emptySummary : tenants)
     mount()
     await screen.findByRole('heading', { name: 'First workspace' })
     const actor = userEvent.setup()
@@ -112,7 +113,7 @@ describe('frontend authentication and tenant foundation', () => {
   it('shows an empty state and refreshes memberships without inventing workspace data', async () => {
     authenticate()
     let attempts = 0
-    api.defaults.adapter = async (config) => response(config, ++attempts === 1 ? [] : tenants)
+    api.defaults.adapter = async (config) => response(config, config.url?.endsWith('/dashboard/summary') ? emptySummary : ++attempts === 1 ? [] : tenants)
     mount()
     await screen.findByRole('heading', { name: 'Your next chapter starts with a workspace.' })
     await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh workspaces' }))
@@ -123,6 +124,7 @@ describe('frontend authentication and tenant foundation', () => {
     authenticate()
     let attempts = 0
     api.defaults.adapter = async (config) => {
+      if (config.url?.endsWith('/dashboard/summary')) return response(config, emptySummary)
       if (++attempts === 1) throw new AxiosError('Network unavailable', 'ERR_NETWORK', config)
       return response(config, tenants)
     }
