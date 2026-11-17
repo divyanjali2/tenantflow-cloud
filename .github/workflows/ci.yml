@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build and integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: 'true'
+      DOTNET_ENVIRONMENT: Testing
+      ASPNETCORE_ENVIRONMENT: Testing
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 10 SDK
+        id: dotnet
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Select the installed .NET 10 SDK
+        env:
+          DOTNET_SDK_VERSION: ${{ steps.dotnet.outputs.dotnet-version }}
+        run: |
+          # Generated only on the runner: do not accidentally use a newer preinstalled SDK.
+          printf '{"sdk":{"version":"%s","rollForward":"disable","allowPrerelease":false}}\n' "$DOTNET_SDK_VERSION" > global.json
+          dotnet --version
+
+      - name: Cache NuGet packages
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-net10-${{ hashFiles('backend/TenantFlow.Api/TenantFlow.Api.csproj', 'backend/TenantFlow.Api.Tests/TenantFlow.Api.Tests.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-net10-
+
+      - name: Verify Docker for Testcontainers
+        # The fixture starts postgres:17-alpine with generated credentials and a
+        # fresh database per test. Never start the development Compose services.
+        run: docker version
+
+      - name: Restore backend dependencies
+        run: dotnet restore TenantFlow.slnx
+
+      - name: Build outer API and integration tests
+        run: dotnet build TenantFlow.slnx --configuration Release --no-restore -p:UseAppHost=false
+
+      - name: Run PostgreSQL integration tests
+        run: dotnet test TenantFlow.Api.Tests/TenantFlow.Api.Tests.csproj --configuration Release --no-build --no-restore --results-directory TestResults --logger "trx;LogFileName=integration.trx"
+
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-test-results
+          path: backend/TestResults/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend:
+    name: Frontend build and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+        shell: bash
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js 24 and cache npm downloads
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies from lockfile
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run frontend tests
+        run: npm run test -- --run
